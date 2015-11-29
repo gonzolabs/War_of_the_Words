@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+
+<title>Word Wars</title>
+
+<script  src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+        
+<style type="text/css">
+
+*:focus {
+    outline: none;
+}
+.div {
+    display: inline-block;
+}
+.table {
+    cellpadding: "20";
+}
+#letterboard1 text {
+    color: red;
+}
+#letterboard2 text {
+    color: blue;
+}
+#text {
+  z-index: 99;
+  font-size="12";
+  font-family="Verdana"
+}
+svg {
+    height: 100%;
+    width: 100%;
+}
+.hexfield {
+  fill: transparent;
+  stroke: yellowgreen;
+  stroke-width: 1;
+}
+.hexfield:focus {
+  outline:none;
+}
+.hexfield:hover {
+  fill: transparent;
+  stroke: purple;
+  stroke-width: 2;
+}
+.hexfield:active {
+  fill: red;
+  outline: none;
+}
+.hexfield.clicked{
+  fill: yellow;
+}
+#selectedLetter{
+    position:absolute;
+    z-index: -99;
+}
+</style>
+</head>
+
+<body>
+
+<table>
+    <td>
+    <tr>
+        Player 1
+    </tr>
+    <tr>
+<button type="button" onclick="letterboard1.newLetters()">Refresh Letters</button>
+    </tr>
+    </td>
+</table>
+
+<div id="letterboard1"></div>
+<hr>
+<div id="gameboard"> </div>
+<hr>
+<div id="letterboard2"> </div>        
+<div id="selectedLetter"></div>
+
+<table>
+    <td>
+    <tr>
+        Player 2
+    </tr>
+    <tr>
+<button type="button" onclick="letterboard2.newLetters()">Refresh Letters</button>
+    </tr>
+    </td>
+</table>
+
+<script>
+
+var game = {
+    selectedLetter: "",
+    letters: 'EEEEEEEEEEEEAAAAAAAAAIIIIIIIIIOOOOOOOONNNNNNRRRRRRTTTTTTLLLLSSSSUUUUDDDDGGGBBCCMMPPFFHHVVWWYYKJXQZ'.split(''),
+    // To Do: the turn-based game data that will be passed between the server and the browser each turn
+    data: {}
+};
+
+var Grid = function (divId, radius, columns, rows, cssClass, playerColor) {
+    this.divId = divId;
+    this.radius = radius;
+    this.columns = columns;
+    this.rows = rows;
+    this.cssClass = cssClass;
+    this.playerColor = playerColor;
+
+    Grid.prototype.newLetters = function () {
+        var selector = "#%id text".replace("%id", this.divId);
+        var tiles = $(selector);
+        for (i = 0, len = 20; i < len; i++) {
+            var letter = game.letters[Math.floor(Math.random() * game.letters.length)];
+            $(tiles[i]).text(letter);
+        }
+    };
+
+    Grid.prototype.click = function (event) {
+        // initialize the cursor letter
+        $("#selectedLetter").text(game.selectedLetter);
+        // find the clicked polygon and text elements
+        var col = $(event.target).attr("col");
+        var row = $(event.target).attr("row");
+        var coords = "[col=%x][row=%y]".replace("%x", col).replace("%y", row);
+        var selector = "#%id text%coords".replace("%id", this.id).replace("%coords", coords);
+        var textElement = $(selector);
+        // if the hex is empty and you have a selectedLetter
+        if (!textElement.text() && game.selectedLetter) {
+            textElement.text(game.selectedLetter);
+            game.selectedLetter = "";
+        }
+        // if the hex has a letter and you have no selectedLetter
+        else if (textElement.text() && !game.selectedLetter) {
+            game.selectedLetter = textElement.text();
+            textElement.text("");
+        }
+        // update the cursor letter
+        $("#selectedLetter").text(game.selectedLetter);
+    };
+
+    Grid.prototype.drawGrid = function () {
+        // define the svg namespace
+        var svgNS = "http://www.w3.org/2000/svg";
+        // create the SVG parent element
+        var svg = document.createElementNS(svgNS, "svg");
+        var height = Math.sqrt(3) / 2 * this.radius;
+        svg.setAttribute('tabindex', 1);
+        svg.style.width = (2 * this.columns  +  1) * this.radius;
+        svg.style.height = (2 * this.rows  +  1) * height;
+
+        // iterate over columns and rows to generate a hexagon board
+        for (row = 0; row < this.rows; row++) {
+            for (column = 0; column < this.columns; column++) {
+
+                // create the polygon element 
+                var polygon = document.createElementNS(svgNS, "polygon");
+                polygon.setAttribute("stroke", this.playerColor);
+
+                polygon.setAttribute("class", "hexfield");
+                polygon.setAttribute("col", column);
+                polygon.setAttribute("row", row);
+                var center = {x:Math.round((1 + 1.5 * column) * this.radius), 
+                    y: Math.round(height * (1 + row * 2 + (column % 2)))};
+                toPoint = function (dx, dy) {
+                    return Math.round(dx + center.x) + ',' + Math.round(dy + center.y);
+                };
+                var points = [
+                        toPoint(-1 * this.radius / 2, -1 * height),
+                        toPoint(this.radius / 2, -1 * height),
+                        toPoint(this.radius, 0),
+                        toPoint(this.radius / 2, height),
+                        toPoint(-1 * this.radius / 2, height),
+                        toPoint(-1 * this.radius, 0)
+                    ].join(' ');
+                polygon.setAttribute("points", points);
+
+                // create the text element
+                var text = document.createElementNS(svgNS, "text");
+                // To Do:  Make these x/y offsets relative to radius and fontsize
+                text.setAttribute("col", column);
+                text.setAttribute("row", row);
+                text.setAttribute("x", center.x - 5);
+                text.setAttribute("y", center.y + 5);
+
+                // append text to svg and then append polygon, so polygon is on top layer
+                svg.appendChild(text);
+                svg.appendChild(polygon);
+
+        // append svg to this div in the document                
+        document.getElementById(this.divId).appendChild(svg);
+        document.getElementById(this.divId).addEventListener("click", this.click);
+            }
+        }
+    }
+};
+
+// initialize the hex boards
+var gameboard = new Grid("gameboard", 15, 20, 10, "hexfield", "yellowgreen");
+var letterboard1 = new Grid("letterboard1", 15, 20, 2, "hexfield", "orange");
+var letterboard2 = new Grid("letterboard2", 15, 20, 2, "hexfield", "green");
+gameboard.drawGrid();
+letterboard1.drawGrid();
+letterboard1.newLetters();
+letterboard2.drawGrid();
+letterboard2.newLetters();
+
+// make currentLetter track the mouse cursor
+$(document).mousemove(function(e) {
+    $("#selectedLetter").css({left:e.pageX, top:e.pageY});
+});
+
+</script>
+
+</body>
+</html>
+
+
+
+
