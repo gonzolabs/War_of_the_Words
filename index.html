@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>WORDWARS!</title>
+    <link href="main.css" rel="stylesheet" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="hexgrid.js"></script>
+</head>
+
+<body>
+<div id="wrapper">
+    <div id="header"><div id="header-content">WordWars!</div></div>
+    <div id="content">
+
+        <div id="sidebar">
+
+            <p>
+                Click on empty field to activate it (or remove pieces
+                depending on the selected action below),
+                then press the letter you want to play
+            </p>
+
+            <p>ACTION</p>
+            <form action="">
+                <input type="radio" name="actiontype" value="play_black" checked>Play black pieces<br>
+                <input type="radio" name="actiontype" value="play_white">Play white pieces<br>
+                <input type="radio" name="actiontype" value="removeToBag">Move pieces to bag<br>
+                <input type="radio" name="actiontype" value="removeToPlayer">Move pieces back to player<br>
+            </form>
+            <br>
+
+            <p>PIECES</p>
+            <div id="pieces">
+                <ul id="black_pieces"></ul>
+                <ul id="white_pieces"></ul>
+                <form action="">
+                    <button type="button" id="complete_move">Draw new pieces</button>
+                </form>
+            </div>
+            <br>
+
+            <p>BOARD</p>
+            <form action="">
+                <p><button type="button" id="resetBoard">New Board</button>&nbsp;&nbsp;
+                Size: <input type="number" id="sidelength" value="11" size="2" min="3" max="21"></form></p>
+            </form>
+
+        </div>
+
+        <div id="main">
+            <canvas id="gameBoard">
+                This text is displayed if your browser does not support HTML5 Canvas. You cannot play. Sorry.
+            </canvas>
+        </div>
+
+    </div>
+    <div class="push"></div>
+</div>
+<div id="footer"><div id="footer-content">The John &amp; Sebastian playground!</div></div>
+</body>
+
+</html>
