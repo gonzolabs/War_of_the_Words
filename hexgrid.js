@@ -126,8 +126,9 @@ function HexagonBoard(sideLength) {
     this.draw = function(c) {
         var ctx = c.getContext("2d");
         this.canvasContext = ctx;
-        ctx.canvas.width  = $("#gameBoard").width() * 3;
-        ctx.canvas.height = $("#gameBoard").height() * 3;
+        var gameBoard = $("#gameBoard");
+        ctx.canvas.width  = gameBoard.width() * 3;
+        ctx.canvas.height = gameBoard.height() * 3;
         drawHexagonBoard(ctx, this);
         if (this.active_col != -1 && this.active_row != -1) {
             this.redraw(this.active_col, this.active_row);
@@ -228,10 +229,16 @@ function LetterSet() {
     this.draw = function() {
         var piece_list = $("#black_pieces");
         piece_list.empty();
-        $.each(this.letters_black, function(i, obj) { piece_list.append("<li>" + obj + "</li>"); });
+        $.each(this.letters_black, function(i, obj) {
+            element_id = "B-" + i;
+            piece_list.append("<li id='" + element_id + "'>" + obj + "</li>");
+        });
         piece_list = $("#white_pieces");
         piece_list.empty();
-        $.each(this.letters_white, function(i, obj) { piece_list.append("<li>" + obj + "</li>"); });
+        $.each(this.letters_white, function(i, obj) {
+            element_id = "W-" + i;
+            piece_list.append("<li id='" + element_id + "'>" + obj + "</li>");
+        });
     };
 
     //Pull letters from bag to fill up a player's board
@@ -273,26 +280,72 @@ function LetterSet() {
 
 }
 
+function WordWarGame(boardSideLength, letterSetSize) {
+
+    //Get the canvas element
+    this.c = document.getElementById("gameBoard");
+
+    //Initialize the board and draw it for the first time
+    this.board = new HexagonBoard(boardSideLength);
+    this.board.draw(this.c);
+
+    //Initialize the letters
+    this.letterSet = new LetterSet();
+    this.letterSet.letters_per_player = letterSetSize;
+
+    //pull new letters for both players (could later be split for each player)
+    this.pull_letters = function() {
+        this.letterSet.pull_letters(this.letterSet.letters_white);
+        this.letterSet.pull_letters(this.letterSet.letters_black);
+    };
+
+    this.playLetter = function (color, letter) {
+
+        if (!(color == "B" || color == "W")) { throw new Error("Unknown color '" + color + "'"); }
+
+        var player_letters = (color == "B") ? this.letterSet.letters_black : this.letterSet.letters_white;
+
+        for (var i = 0; i != player_letters.length; ++i) {
+            if (player_letters[i] == letter) {
+                player_letters.splice(i,1);
+                this.letterSet.draw();
+                this.board.boardFieldArray[this.board.active_col][this.board.active_row].letter = letter;
+                this.board.boardFieldArray[this.board.active_col][this.board.active_row].type = color;
+                this.board.deactivate();
+                break;
+            }
+        }
+
+    };
+
+    this.redraw = function() {
+        this.board.draw(this.c);
+    };
+
+}
+
+
 
 
 /*
- * Initialization upon page load
+ * Initialization upon page load and set event listeners
  */
 $(function() {
 
-    //Get the canvas element
-    var c = document.getElementById("gameBoard");
-
-    //Initialize the board and draw it for the first time
-    var board = new HexagonBoard(11);  // 11 is the default size, modify this to change default
-    board.draw(c);
-
-    //Initialize the letters
-    var letterSet = new LetterSet();
-    letterSet.letters_per_player = 12;
+    var game = new WordWarGame(11,12);
 
     //Add window scaling/resizing event listener
-    window.addEventListener('resize', function() {board.draw(c)}, false);
+    window.addEventListener('resize', function() {game.redraw()}, false);
+
+    //Add click event listener to the pieces
+    $("#pieces").click(function(e) {
+        if (e.target.tagName == "LI") {
+            game.board.deactivate();
+            var letter = e.target.innerHTML;
+            var color = e.target.id.substr(0,1);
+            console.log("Clicked '" + letter + "' with color " + color);
+        }
+    });
 
     //Add click event listener to the main board
     $("#gameBoard").click(function(e) {
@@ -302,27 +355,29 @@ $(function() {
         var click_x = Math.round((e.pageX - p.left) * scale);
         var click_y = Math.round((e.pageY - p.top) * scale);
 
-        board.deactivate();
+        game.board.deactivate();
 
-        for (var i = 0; i != board.boardFieldArray.length; ++i) {
-            for (var j = 0; j != board.boardFieldArray[i].length; ++j) {
-                if (board.boardFieldArray[i][j].type != "X" &&
-                    board.boardFieldArray[i][j].containsCoordinate(click_x, click_y)) {
-                        //Found a hexagon that was clicked on
-                        var action_type = $('input[name=actiontype]:checked').val();
-                        if (action_type == "removeToBag") {
-                            letterSet.addToBag(board.boardFieldArray[i][j].letter);
-                            board.clearField(i, j);
-                        } else if (action_type == "removeToPlayer") {
-                            if (board.boardFieldArray[i][j].type == "W") {
-                                letterSet.addToWhite(board.boardFieldArray[i][j].letter);
-                            } else if (board.boardFieldArray[i][j].type == "B") {
-                                letterSet.addToBlack(board.boardFieldArray[i][j].letter);
-                            }
-                            board.clearField(i, j);
-                        } else {
-                            board.activate(i, j);
+        for (var i = 0; i != game.board.boardFieldArray.length; ++i) {
+            for (var j = 0; j != game.board.boardFieldArray[i].length; ++j) {
+                if (game.board.boardFieldArray[i][j].type != "X" &&
+                    game.board.boardFieldArray[i][j].containsCoordinate(click_x, click_y)) {
+
+                    //Found a hexagon that was clicked on
+                    var action_type = $('input[name=actiontype]:checked').val();
+                    if (action_type == "removeToBag") {
+                        game.letterSet.addToBag(board.boardFieldArray[i][j].letter);
+                        game.board.clearField(i, j);
+                    } else if (action_type == "removeToPlayer") {
+                        if (game.board.boardFieldArray[i][j].type == "W") {
+                            game.letterSet.addToWhite(board.boardFieldArray[i][j].letter);
+                        } else if (game.board.boardFieldArray[i][j].type == "B") {
+                            game.letterSet.addToBlack(board.boardFieldArray[i][j].letter);
                         }
+                        game.board.clearField(i, j);
+                    } else {
+                        game.board.activate(i, j);
+                    }
+
                 }
             }
         }
@@ -332,53 +387,27 @@ $(function() {
     //Detect keypress
     $(document).keypress(function(e) {
         var charCode = e.which;
-        if ( ((charCode > 64 && charCode < 91) ||  (charCode > 96 && charCode < 123)) && board.hasActive()) {
+        if ( ((charCode > 64 && charCode < 91) ||  (charCode > 96 && charCode < 123)) && game.board.hasActive()) {
             var action = $('input[name=actiontype]:checked').val();
             var upperCharStr = String.fromCharCode(charCode).toUpperCase();
-
-            if (action == "play_black") {
-                //Check if player has that letter and play it if yes
-                for (var i = 0; i !=letterSet.letters_black.length; ++i) {
-                    if (letterSet.letters_black[i] == upperCharStr) {
-                        letterSet.letters_black.splice(i,1);
-                        letterSet.draw();
-                        board.boardFieldArray[board.active_col][board.active_row].letter = upperCharStr;
-                        board.boardFieldArray[board.active_col][board.active_row].type = "B";
-                        board.deactivate();
-                        break;
-                    }
-                }
-            }
-
-            if (action == "play_white") {
-                //Check if player has that letter and play it if yes
-                for (var i = 0; i != letterSet.letters_white.length; ++i) {
-                    if (letterSet.letters_white[i] == upperCharStr) {
-                        letterSet.letters_white.splice(i, 1);
-                        letterSet.draw();
-                        board.boardFieldArray[board.active_col][board.active_row].letter = upperCharStr;
-                        board.boardFieldArray[board.active_col][board.active_row].type = "W";
-                        board.deactivate();
-                        break;
-                    }
-                }
-            }
+            if (action == "play_black") { game.playLetter("B", upperCharStr); }
+            if (action == "play_white") { game.playLetter("W", upperCharStr); }
         }
     });
 
     //Add reset event to the reset button in the sidebar
     $("#resetBoard").click(function(e) {
         var board_size = document.getElementById("sidelength").value;
-        board = new HexagonBoard(board_size);
-        letterSet = new LetterSet();
-        board.draw(c)
+        game = new WordWarGame(board_size,12)
     });
 
     //Add events to 'finish move' button
     $("#complete_move").click(function(e) {
-        letterSet.pull_letters(letterSet.letters_white);
-        letterSet.pull_letters(letterSet.letters_black);
+        game.pull_letters();
     });
+
+
+
 
 });
 
