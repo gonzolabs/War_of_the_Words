@@ -3,6 +3,11 @@
  *   - HexagonField is the main class storing the individual playing fields
  *   - HexagonBoard contains the entire game board (including an array of HexagonFields)
  *   - LetterSet is the class used to manage the letters of the two players
+ *   - WordWarGame is the main game class (containing the board and letters and playing functions)
+ *   - FloatingField is the class that can display a floating piece to be dragged on the board
+ *
+ *   TODO: Need to implement an "undo" function for convenience
+ *   TODO: Need to enable two-player play via server
  */
 
 
@@ -214,8 +219,7 @@ function drawHexagonBoard(ctx, hexagonBoard) {
 
 
 /*
- * Letterset to keep track of the letters for the players
- * and draw new ones
+ * LetterSet keeps track of the letters for the players and contains functions to draw new random ones
  */
 function LetterSet() {
 
@@ -230,14 +234,12 @@ function LetterSet() {
         var piece_list = $("#black_pieces");
         piece_list.empty();
         $.each(this.letters_black, function(i, obj) {
-            element_id = "B-" + i;
-            piece_list.append("<li id='" + element_id + "'>" + obj + "</li>");
+            piece_list.append("<li id='B-" + i + "'>" + obj + "</li>");
         });
         piece_list = $("#white_pieces");
         piece_list.empty();
         $.each(this.letters_white, function(i, obj) {
-            element_id = "W-" + i;
-            piece_list.append("<li id='" + element_id + "'>" + obj + "</li>");
+            piece_list.append("<li id='W-" + i + "'>" + obj + "</li>");
         });
     };
 
@@ -271,7 +273,7 @@ function LetterSet() {
     };
 
     //Initialize letters
-    if (this.letters.length < 2 * this.letter_per_player) {
+    if (this.letters.length < 2 * this.letters_per_player) {
         alert("Warning: Not enough letters to initialize both players");
     }
     this.pull_letters(this.letters_black, this.letters_per_player);
@@ -279,6 +281,34 @@ function LetterSet() {
     this.draw();
 
 }
+
+/*
+ * Floating letter piece to enable drag&drop play
+ */
+function FloatingPiece() {
+    this.letter = "";
+    this.letter_color = "";
+    this.active = false;
+    this.htmlElement = $("#dragPiece");
+    this.htmlElement.hide();
+
+    this.activate = function (letter, color) {
+        if (!(color == "B" || color == "W")) { throw new Error("Unknown color '" + color + "'"); }
+        this.letter = letter;
+        this.letter_color = color;
+        if (color == "B") { this.htmlElement.css({"color": "#eee", "background-color":"#111"}); }
+        if (color == "W") { this.htmlElement.css({"color": "#111", "background-color":"#eee"}); }
+        this.htmlElement.html(letter);
+        this.active = true;
+        this.htmlElement.show();
+    };
+
+    this.deactivate = function () {
+        this.active = false;
+        this.htmlElement.hide();
+    };
+}
+
 
 function WordWarGame(boardSideLength, letterSetSize) {
 
@@ -299,14 +329,13 @@ function WordWarGame(boardSideLength, letterSetSize) {
         this.letterSet.pull_letters(this.letterSet.letters_black);
     };
 
+    // Play a letter of a given color on the board
+    // (board must have an active field to play on)
     this.playLetter = function (color, letter) {
-
         if (!(color == "B" || color == "W")) { throw new Error("Unknown color '" + color + "'"); }
-
         var player_letters = (color == "B") ? this.letterSet.letters_black : this.letterSet.letters_white;
-
         for (var i = 0; i != player_letters.length; ++i) {
-            if (player_letters[i] == letter) {
+            if (player_letters[i] == letter && this.board.hasActive) {
                 player_letters.splice(i,1);
                 this.letterSet.draw();
                 this.board.boardFieldArray[this.board.active_col][this.board.active_row].letter = letter;
@@ -315,7 +344,6 @@ function WordWarGame(boardSideLength, letterSetSize) {
                 break;
             }
         }
-
     };
 
     this.redraw = function() {
@@ -325,25 +353,24 @@ function WordWarGame(boardSideLength, letterSetSize) {
 }
 
 
-
-
 /*
- * Initialization upon page load and set event listeners
+ * Initialization of the page upon load and setting of global event listeners
  */
 $(function() {
 
     var game = new WordWarGame(11,12);
+    var floatingPiece = new FloatingPiece();
 
     //Add window scaling/resizing event listener
     window.addEventListener('resize', function() {game.redraw()}, false);
 
-    //Add click event listener to the pieces
-    $("#pieces").click(function(e) {
+    //Add click event listener to the pieces to enable dragging them into the board
+    $("#pieces").mousedown(function(e) {
         if (e.target.tagName == "LI") {
             game.board.deactivate();
             var letter = e.target.innerHTML;
             var color = e.target.id.substr(0,1);
-            console.log("Clicked '" + letter + "' with color " + color);
+            floatingPiece.activate(letter, color);
         }
     });
 
@@ -351,10 +378,9 @@ $(function() {
     $("#gameBoard").click(function(e) {
 
         var scale = 3;
-        p = $("#gameBoard").offset();
+        var p = $("#gameBoard").offset();
         var click_x = Math.round((e.pageX - p.left) * scale);
         var click_y = Math.round((e.pageY - p.top) * scale);
-
         game.board.deactivate();
 
         for (var i = 0; i != game.board.boardFieldArray.length; ++i) {
@@ -362,52 +388,77 @@ $(function() {
                 if (game.board.boardFieldArray[i][j].type != "X" &&
                     game.board.boardFieldArray[i][j].containsCoordinate(click_x, click_y)) {
 
-                    //Found a hexagon that was clicked on
+                    // Found a hexagon that was clicked on. We first check whether we
+                    // are dragging a letter into an empty field. If yes this has priority.
+                    // Otherwise we look at the action radio button and execute the appropriate
+                    // function
+
+                    // If the floating piece is active and can be played on the click location, play it
+                    var clickedField = game.board.boardFieldArray[i][j];
+                    if (floatingPiece.active) {
+                        if (clickedField.type == "N") {
+                            game.board.activate(i,j);
+                            game.playLetter(floatingPiece.letter_color, floatingPiece.letter);
+                            floatingPiece.deactivate();
+                            return;
+                        }
+                    }
+
+                    // Otherwise perform the action specified in the "ACTION" menu
                     var action_type = $('input[name=actiontype]:checked').val();
                     if (action_type == "removeToBag") {
-                        game.letterSet.addToBag(board.boardFieldArray[i][j].letter);
+                        game.letterSet.addToBag(clickedField.letter);
                         game.board.clearField(i, j);
                     } else if (action_type == "removeToPlayer") {
-                        if (game.board.boardFieldArray[i][j].type == "W") {
-                            game.letterSet.addToWhite(board.boardFieldArray[i][j].letter);
-                        } else if (game.board.boardFieldArray[i][j].type == "B") {
-                            game.letterSet.addToBlack(board.boardFieldArray[i][j].letter);
+                        if (clickedField.type == "W") {
+                            game.letterSet.addToWhite(clickedField.letter);
+                        } else if (clickedField.type == "B") {
+                            game.letterSet.addToBlack(clickedField.letter);
                         }
                         game.board.clearField(i, j);
                     } else {
                         game.board.activate(i, j);
                     }
-
+                    return;
                 }
             }
         }
-
+        floatingPiece.deactivate(); // Deactivate floating piece if we couldn't play it
     });
 
     //Detect keypress
-    $(document).keypress(function(e) {
+    $(document).keydown(function(e) {
         var charCode = e.which;
+        // If an ASCII character was pressed, attempt to play that letter on the board
         if ( ((charCode > 64 && charCode < 91) ||  (charCode > 96 && charCode < 123)) && game.board.hasActive()) {
             var action = $('input[name=actiontype]:checked').val();
             var upperCharStr = String.fromCharCode(charCode).toUpperCase();
             if (action == "play_black") { game.playLetter("B", upperCharStr); }
             if (action == "play_white") { game.playLetter("W", upperCharStr); }
         }
+        // If Escape or Enter are pressed, deactivate the floating piece
+        if (charCode == 8 || charCode == 27) {
+            floatingPiece.deactivate();
+        }
     });
 
     //Add reset event to the reset button in the sidebar
-    $("#resetBoard").click(function(e) {
+    $("#resetBoard").click(function() {
         var board_size = document.getElementById("sidelength").value;
-        game = new WordWarGame(board_size,12)
+        game = new WordWarGame(board_size,12);
+        floatingPiece.deactivate();
     });
 
-    //Add events to 'finish move' button
-    $("#complete_move").click(function(e) {
+    //Add action to 'Draw New Pieces' button
+    $("#complete_move").click(function() {
+        floatingPiece.deactivate();
         game.pull_letters();
     });
 
-
-
+    //Make the floating piece follow the mouse pointer
+    $(document).bind('mousemove', function(e){
+        $('#dragPiece').css({"left": e.pageX+2, "top": e.pageY-32});
+    });
 
 });
 

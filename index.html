@@ -32,32 +32,33 @@
                 <form action="">
                     <button type="button" id="complete_move">Draw new pieces</button>
                 </form>
+                <div id="dragPiece">?</div>  <!-- Hidden div for dragging pieces to board -->
             </div>
+
             <br>
 
             <p>BOARD</p>
             <form action="">
-                <p><button type="button" id="resetBoard">New Board</button>&nbsp;&nbsp;
-                Size: <input type="number" id="sidelength" value="11" size="2" min="3" max="21"></form></p>
+                    <button type="button" id="resetBoard">New Game</button>&nbsp;&nbsp;
+                    Size: <input type="number" id="sidelength" value="11" size="2" min="3" max="21">
             </form>
 
         </div>
 
         <div id="main">
             <canvas id="gameBoard">
-                This text is displayed if your browser does not support HTML5 Canvas. You cannot play. Sorry.
+                This text is displayed if your browser does not support HTML5 Canvas.
+                You cannot play. Sorry.
             </canvas>
         </div>
-
     </div>
     <div class="push"></div>
 </div>
 <div id="footer">
     <div id="footer-content">
-        Click on empty field to activate it (or remove pieces
-        depending on the selected action), then press the letter
-        you want to play. Alternatively, pieces can be clicked
-        on and dragged to the board.
+        Click on empty field to activate it (or remove pieces depending on the selected action),
+        then press the letter you want to play. Alternatively, pieces can be clicked on and
+        dragged to the board.
     </div>
 </div>
 </body>
