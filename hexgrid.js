@@ -367,10 +367,13 @@ $(function() {
     //Add click event listener to the pieces to enable dragging them into the board
     $("#pieces").mousedown(function(e) {
         if (e.target.tagName == "LI") {
-            game.board.deactivate();
             var letter = e.target.innerHTML;
             var color = e.target.id.substr(0,1);
-            floatingPiece.activate(letter, color);
+            if (game.board.hasActive()) { // If active field is set, clicking on a letter plays it
+                game.playLetter(color, letter);
+            } else {  // If no active field is set, the letter becomes dragable
+                floatingPiece.activate(letter, color);
+            }
         }
     });
 
